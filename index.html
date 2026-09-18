@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ArogyaSeva: Rural Healthcare Outreach &amp; Telemedicine Platform</title>
+  <meta name="description" content="A complete offline-first rural telemedicine platform with AI triage confidence scoring, urgent escalation, multilingual support, and medicine/vaccine inventory tracking." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React & ReactDOM (Production UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel Standalone for in-browser JSX compilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Custom subtle animations */
+    @keyframes pulse-fast {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    .animate-pulse-fast {
+      animation: pulse-fast 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 font-sans antialiased">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- SVG ICON SYSTEM (Zero External Dependency for Reliability) ---
+    const Icon = ({ name, className = "w-4 h-4", ...props }) => {
+      const icons = {
+        activity: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />,
+        heart: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />,
+        stethoscope: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />,
+        users: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />,
+        package: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />,
+        fileText: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />,
+        alertTriangle: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />,
+        wifi: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />,
+        wifiOff: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 1l22 22m-4.343-4.343A5.5 5.5 0 008.111 16.4M12 20h.01M5.636 10.364a9.97 9.97 0 00-2.316 2.565m17.043 0A10.02 10.02 0 0018.364 10.364M1.393 9.393a14.98 14.98 0 013.987-2.73" />,
+        signalLow: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2 20h.01M7 20v-4m5 4v-8m5 8V4" />,
+        refresh: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />,
+        video: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />,
+        phoneOff: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 8l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M5 3a2 2 0 00-2 2v1c0 8.284 6.716 15 15 15h1a2 2 0 002-2v-3.28a1 1 0 00-.684-.948l-4.493-1.498a1 1 0 00-1.21.502l-1.13 2.257a11.042 11.042 0 01-5.516-5.517l2.257-1.128a1 1 0 00.502-1.21L9.228 3.683A1 1 0 008.279 3H5z" />,
+        check: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />,
+        sparkles: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />,
+        thermometer: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />,
+        truck: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />,
+        printer: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4H7v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />,
+        globe: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+      };
+      return (
+        <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" {...props}>
+          {icons[name] || icons.activity}
+        </svg>
+      );
+    };
+
+    // --- MULTILINGUAL TRANSLATIONS DICTIONARY ---
+    const LANGUAGES = [
+      { code: "en", name: "English", native: "English" },
+      { code: "hi", name: "Hindi", native: "हिन्दी" },
+      { code: "bn", name: "Bengali", native: "বাংলা" },
+      { code: "mr", name: "Marathi", native: "मराठी" },
+      { code: "te", name: "Telugu", native: "తెలుగు" },
+      { code: "ta", name: "Tamil", native: "தமிழ்" },
+      { code: "es", name: "Spanish", native: "Español" },
+      { code: "sw", name: "Swahili", native: "Kiswahili" },
+    ];
+
+    const UI_TEXT = {
+      en: {
+        appTitle: "ArogyaSeva: Rural Outreach & Telemedicine",
+        hwPortal: "Health Worker Portal (Field)",
+        docPortal: "Doctor Telemedicine Desk",
+        invPortal: "Medicine & Vaccine Stock",
+        bidPortal: "Solution Bid & Technical Blueprint",
+        urgentEscalation: "🚨 Flag as URGENT Escalation",
+        runAiTriage: "Run AI Triage & Confidence Assessment",
+        saveRecord: "Save & Queue Patient (Offline / Online)",
+        connectDoctor: "Connect Telemedicine Doctor",
+      },
+      hi: {
+        appTitle: "आरोग्यसेवा: ग्रामीण स्वास्थ्य एवं टेलीमेडिसिन",
+        hwPortal: "स्वास्थ्य कार्यकर्ता पोर्टल (आशा)",
+        docPortal: "डॉक्टर टेलीमेडिसिन डेस्क",
+        invPortal: "दवा एवं टीका भंडार",
+        bidPortal: "प्रोजेक्ट प्रस्ताव एवं रूपरेखा",
+        urgentEscalation: "🚨 आपातकालीन / गंभीर स्थिति घोषित करें",
+        runAiTriage: "एआई नैदानिक आकलन एवं जोखिम जांच",
+        saveRecord: "मरीज का रिकॉर्ड सुरक्षित करें",
+        connectDoctor: "डॉक्टर से वीडियो/ऑडियो परामर्श शुरू करें",
+      }
+    };
+
+    // --- INITIAL MOCK DATA ---
+    const INITIAL_PATIENTS = [
+      {
+        id: "pat-101",
+        nationalId: "IN-VIL-9428-11",
+        name: "Sunita Devi",
+        age: 29,
+        gender: "Female",
+        village: "Village Rampur (North Ridge)",
+        subCenter: "Rampur Sub-Health Center #3",
+        contactNumber: "+91 98765 43210",
+        allergies: ["Penicillin"],
+        chronicConditions: ["Anemia (mild)"],
+        currentSymptoms: ["High Fever", "Severe Chills", "Body Aches", "Severe Headache"],
+        primaryComplaint: "Sudden onset high-grade fever with shivering every evening",
+        symptomDuration: "3 days",
+        vitals: { bp: "105/70", pulse: "112", temp: "103.4", spo2: "93", respRate: "24", bloodSugar: "98" },
+        symptomNotes: "ASHA worker performed RDT strip test showing faint Pf band. Patient shivering intensely.",
+        isUrgent: true,
+        urgentReason: "Severe fever (103.4°F), tachycardia (112 bpm), SpO2 93% with positive malaria test.",
+        status: "waiting_triage",
+        aiAssessment: {
+          preliminaryAssessment: "Suspected Falciparum Malaria / Acute Severe Febrile Syndrome",
+          confidenceScore: 91,
+          urgency: "CRITICAL",
+          urgencyReason: "Endemic zone + severe temperature spike and low SpO2.",
+          differentialDiagnoses: [
+            { condition: "Plasmodium Falciparum Malaria", probability: 82, reasoning: "Rigors and periodic chills." },
+            { condition: "Dengue Fever / Viral Episode", probability: 58, reasoning: "Retro-orbital pain and arthralgia." }
+          ],
+          actions: ["Tepid sponge with water", "Hydrate with ORS", "Immediate tele-doctor consultation"]
+        }
+      },
+      {
+        id: "pat-102",
+        nationalId: "IN-VIL-3819-04",
+        name: "Rameshwar Patel",
+        age: 64,
+        gender: "Male",
+        village: "Village Sundarpur",
+        subCenter: "Sundarpur Rural Dispensary",
+        contactNumber: "+91 94561 23456",
+        allergies: ["None known"],
+        chronicConditions: ["COPD / Smoker", "Hypertension"],
+        currentSymptoms: ["Severe Shortness of Breath", "Chest Tightness", "Audible Wheezing"],
+        primaryComplaint: "Cannot breathe lying down; lips turning dusky blue when coughing",
+        symptomDuration: "4 days",
+        vitals: { bp: "162/98", pulse: "108", temp: "99.8", spo2: "88", respRate: "30", bloodSugar: "142" },
+        symptomNotes: "Severe hypoxemia (SpO2 88%). Patient in tripod posture gasping.",
+        isUrgent: true,
+        urgentReason: "Critical Hypoxemia (SpO2 88%) with acute COPD exacerbation.",
+        status: "waiting_triage",
+        aiAssessment: {
+          preliminaryAssessment: "Acute Exacerbation of COPD with Respiratory Distress & Hypoxemia",
+          confidenceScore: 94,
+          urgency: "CRITICAL",
+          urgencyReason: "Life-threatening hypoxia (SpO2 < 90%) and tachypnea.",
+          differentialDiagnoses: [
+            { condition: "Acute COPD Exacerbation", probability: 89, reasoning: "Smoking history and wheeze." },
+            { condition: "Lobar Pneumonia", probability: 64, reasoning: "Fever and sputum." }
+          ],
+          actions: ["Start Oxygen 2-3 L/min via cannula", "High Fowler position", "Nebulize Salbutamol"]
+        }
+      },
+      {
+        id: "pat-105",
+        nationalId: "IN-VIL-5529-61",
+        name: "Balwan Singh",
+        age: 42,
+        gender: "Male",
+        village: "Village Dholakpur",
+        subCenter: "Dholakpur Field Center",
+        contactNumber: "+91 93120 78654",
+        allergies: ["None"],
+        chronicConditions: ["None"],
+        currentSymptoms: ["Bite Marks on Ankle", "Localized Swelling", "Numbness in Leg"],
+        primaryComplaint: "Suspected snake bite while working in sugarcane field 45 mins ago",
+        symptomDuration: "45 minutes",
+        vitals: { bp: "148/92", pulse: "116", temp: "98.4", spo2: "97", respRate: "26", bloodSugar: "110" },
+        symptomNotes: "Two puncture wounds on right ankle with rapid local edema.",
+        isUrgent: true,
+        urgentReason: "EMERGENCY: Suspected Snake Envenomation within 1 hour golden window.",
+        status: "waiting_triage",
+        aiAssessment: {
+          preliminaryAssessment: "Suspected Envenomation (Snake Bite) - Emergency Observation & ASV Preparedness",
+          confidenceScore: 96,
+          urgency: "CRITICAL",
+          urgencyReason: "Rapid systemic toxicity risk.",
+          differentialDiagnoses: [
+            { condition: "Viperine Envenomation (Hemotoxic)", probability: 78, reasoning: "Progressive swelling and pain." },
+            { condition: "Elapid Envenomation (Neurotoxic)", probability: 55, reasoning: "Peripheral paresthesia." }
+          ],
+          actions: ["Immobilize limb with splint", "Perform 20-min Whole Blood Clotting Test", "Check Anti-Snake Venom stock"]
+        }
+      }
+    ];
+
+    const INITIAL_INVENTORY = [
+      { id: "med-01", name: "Paracetamol 500mg Tablets", category: "Medicine", quantity: 420, unit: "Tablets", minThreshold: 500, batch: "PCM-2026-88B", expiry: "2027-11-30" },
+      { id: "med-02", name: "Amoxicillin 500mg Capsules", category: "Medicine", quantity: 180, unit: "Capsules", minThreshold: 300, batch: "AMX-2025-41C", expiry: "2027-04-15" },
+      { id: "med-03", name: "Oral Rehydration Salts (ORS)", category: "Medicine", quantity: 780, unit: "Sachets", minThreshold: 250, batch: "ORS-2026-10", expiry: "2028-06-30" },
+      { id: "med-04", name: "Polyvalent Anti-Snake Venom (ASV) 10ml", category: "Emergency Kit", quantity: 3, unit: "Vials", minThreshold: 10, batch: "ASV-2026-09", expiry: "2027-08-20", coldChain: "2°C - 8°C" },
+      { id: "med-05", name: "Rabies Vaccine (Cell Culture ARV)", category: "Vaccine", quantity: 12, unit: "Vials", minThreshold: 20, batch: "RBV-2026-14", expiry: "2027-03-31", coldChain: "2°C - 8°C" },
+      { id: "med-06", name: "Pentavalent Vaccine (DTP-HepB-Hib)", category: "Vaccine", quantity: 8, unit: "Vials", minThreshold: 25, batch: "PTV-2026-52", expiry: "2027-09-15", coldChain: "2°C - 8°C" },
+      { id: "med-07", name: "Bivalent Oral Polio Vaccine (bOPV)", category: "Vaccine", quantity: 140, unit: "Doses", minThreshold: 50, batch: "OPV-2026-90", expiry: "2027-12-31", coldChain: "2°C - 8°C" },
+    ];
+
+    // --- ROOT APP COMPONENT ---
+    function App() {
+      const [role, setRole] = useState("health_worker"); // health_worker, doctor, inventory, bid
+      const [network, setNetwork] = useState("online"); // online, poor_2g, offline
+      const [lang, setLang] = useState("en");
+      const [patients, setPatients] = useState(INITIAL_PATIENTS);
+      const [selectedPatId, setSelectedPatId] = useState("pat-101");
+      const [inventory, setInventory] = useState(INITIAL_INVENTORY);
+      const [teleconsultPat, setTeleconsultPat] = useState(null);
+      const [activeRx, setActiveRx] = useState(null);
+      const [syncQueue, setSyncQueue] = useState([]);
+      const [isSyncing, setIsSyncing] = useState(false);
+
+      const selectedPatient = patients.find(p => p.id === selectedPatId) || patients[0];
+      const lowStockCount = inventory.filter(i => i.quantity <= i.minThreshold).length;
+      const criticalCount = patients.filter(p => p.isUrgent && p.status !== "consulted").length;
+
+      // Rule-based Local AI Triage
+      const calculateLocalTriage = (pat) => {
+        const spo2 = parseFloat(pat.vitals.spo2 || "98");
+        const temp = parseFloat(pat.vitals.temp || "98.6");
+        const isCritical = spo2 < 90 || temp >= 103 || pat.currentSymptoms.some(s => s.toLowerCase().includes("snake") || s.toLowerCase().includes("breath"));
+        return {
+          preliminaryAssessment: isCritical ? "Acute Emergency Presentation" : "Acute Symptomatic Episode",
+          confidenceScore: isCritical ? 92 : 84,
+          urgency: isCritical ? "CRITICAL" : "MODERATE",
+          urgencyReason: isCritical ? `Life-threatening parameter flagged (SpO2: ${spo2}%, Temp: ${temp}°F)` : "Stable baseline vitals with moderate complaint.",
+          differentialDiagnoses: [
+            { condition: "Primary Suspected Condition", probability: 82, reasoning: "Clinical vitals correlation" },
+            { condition: "Secondary Infection Risk", probability: 45, reasoning: "Seasonal endemic prevalence" }
+          ],
+          actions: ["Keep patient in semi-fowler resting posture", "Monitor oxygenation every 15 mins", "Emergency Teleconsultation"]
+        };
+      };
+
+      const handleSaveIntake = (updated) => {
+        setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
+        if (network !== "online") {
+          setSyncQueue(prev => [{ id: Date.now(), item: updated.name, time: new Date().toLocaleTimeString() }, ...prev]);
+        }
+        alert("Patient record saved successfully! (Stored in LocalStorage outbox)");
+      };
+
+      const triggerSync = () => {
+        if (network === "offline") return;
+        setIsSyncing(true);
+        setTimeout(() => {
+          setSyncQueue([]);
+          setIsSyncing(false);
+          alert("Offline queue synchronized with District Health Server!");
+        }, 1200);
+      };
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Top Header */}
+          <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
+            {criticalCount > 0 && (
+              <div className="bg-red-600 text-white px-4 py-1.5 text-xs flex items-center justify-between font-semibold animate-pulse">
+                <span className="flex items-center gap-1.5">
+                  <Icon name="alertTriangle" className="w-4 h-4" />
+                  EMERGENCY BROADCAST: {criticalCount} critical patients flagged in remote village sub-centers!
+                </span>
+                <span className="bg-red-800 px-2 py-0.5 rounded text-[10px]">Active Triage Priority</span>
+              </div>
+            )}
+
+            <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+                  <Icon name="activity" className="w-6 h-6" />
+                </div>
+                <div>
+                  <h1 className="font-extrabold text-slate-900 text-base sm:text-lg tracking-tight">
+                    ArogyaSeva TeleHealth
+                  </h1>
+                  <p className="text-[11px] text-slate-500 hidden sm:block">
+                    Rural Healthcare Outreach &amp; Telemedicine Support Platform
+                  </p>
+                </div>
+              </div>
+
+              {/* Network & Outbox Controls */}
+              <div className="flex items-center gap-2 text-xs">
+                <div className="bg-slate-100 p-1 rounded-lg border border-slate-200 flex items-center">
+                  <button
+                    onClick={() => setNetwork("online")}
+                    className={`px-2 py-1 rounded font-semibold ${network === "online" ? "bg-emerald-600 text-white" : "text-slate-600"}`}
+                  >
+                    Online
+                  </button>
+                  <button
+                    onClick={() => setNetwork("poor_2g")}
+                    className={`px-2 py-1 rounded font-semibold ${network === "poor_2g" ? "bg-amber-600 text-white" : "text-slate-600"}`}
+                  >
+                    2G Slow
+                  </button>
+                  <button
+                    onClick={() => setNetwork("offline")}
+                    className={`px-2 py-1 rounded font-semibold ${network === "offline" ? "bg-rose-600 text-white" : "text-slate-600"}`}
+                  >
+                    Offline
+                  </button>
+                </div>
+
+                <button
+                  onClick={triggerSync}
+                  disabled={network === "offline" || syncQueue.length === 0}
+                  className={`px-3 py-1.5 rounded-lg border font-semibold flex items-center gap-1.5 ${
+                    syncQueue.length > 0 ? "bg-amber-50 text-amber-900 border-amber-300" : "bg-slate-50 text-slate-600 border-slate-200"
+                  }`}
+                >
+                  <Icon name="refresh" className={`w-3.5 h-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                  <span>{syncQueue.length > 0 ? `${syncQueue.length} Outbox` : "Synced"}</span>
+                </button>
+
+                <select
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value)}
+                  className="bg-slate-100 border border-slate-200 text-xs rounded-lg px-2 py-1.5 font-medium"
+                >
+                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.native}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Role Navigation Bar */}
+            <div className="border-t border-slate-200 px-4 max-w-7xl mx-auto flex space-x-2 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setRole("health_worker")}
+                className={`py-2 px-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+                  role === "health_worker" ? "border-emerald-600 text-emerald-700 bg-emerald-50/50" : "border-transparent text-slate-600"
+                }`}
+              >
+                <Icon name="users" className="w-4 h-4 text-emerald-600" />
+                <span>Health Worker (Field)</span>
+              </button>
+
+              <button
+                onClick={() => setRole("doctor")}
+                className={`py-2 px-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+                  role === "doctor" ? "border-blue-600 text-blue-700 bg-blue-50/50" : "border-transparent text-slate-600"
+                }`}
+              >
+                <Icon name="stethoscope" className="w-4 h-4 text-blue-600" />
+                <span>Doctor Telemedicine Desk</span>
+                {criticalCount > 0 && <span className="bg-red-600 text-white text-[10px] px-1.5 rounded-full">{criticalCount}</span>}
+              </button>
+
+              <button
+                onClick={() => setRole("inventory")}
+                className={`py-2 px-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+                  role === "inventory" ? "border-indigo-600 text-indigo-700 bg-indigo-50/50" : "border-transparent text-slate-600"
+                }`}
+              >
+                <Icon name="package" className="w-4 h-4 text-indigo-600" />
+                <span>Medicine &amp; Vaccine Stock</span>
+                {lowStockCount > 0 && <span className="bg-amber-600 text-white text-[10px] px-1.5 rounded-full">{lowStockCount} Low</span>}
+              </button>
+
+              <button
+                onClick={() => setRole("bid")}
+                className={`py-2 px-3 text-xs sm:text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+                  role === "bid" ? "border-purple-600 text-purple-700 bg-purple-50/50" : "border-transparent text-slate-600"
+                }`}
+              >
+                <Icon name="fileText" className="w-4 h-4 text-purple-600" />
+                <span>Bid Strategy &amp; Technical Pitch</span>
+              </button>
+            </div>
+          </header>
+
+          {/* MAIN PORTAL BODY */}
+          <main className="max-w-7xl mx-auto px-4 py-6 w-full flex-1">
+            {/* PORTAL 1: HEALTH WORKER */}
+            {role === "health_worker" && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-2xl p-5 text-white flex justify-between items-center">
+                  <div>
+                    <span className="text-[11px] uppercase tracking-wider font-bold bg-emerald-700/50 px-2 py-0.5 rounded border border-emerald-500/30">ASHA Terminal #4</span>
+                    <h2 className="text-xl font-bold mt-1">Village Intake &amp; Symptom Form</h2>
+                    <p className="text-xs text-emerald-100">Register villagers, capture vital signs, flag urgent emergencies, and consult doctors offline or online.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const name = prompt("Enter Villager Full Name:");
+                      if (name) {
+                        const newP = {
+                          id: `pat-${Date.now().toString().slice(-4)}`,
+                          nationalId: `IN-VIL-${Math.floor(1000+Math.random()*9000)}`,
+                          name,
+                          age: 34,
+                          gender: "Female",
+                          village: "Village Rampur",
+                          subCenter: "Rampur Sub-Center",
+                          contactNumber: "+91 98765 11122",
+                          allergies: [],
+                          chronicConditions: [],
+                          currentSymptoms: ["Fever"],
+                          primaryComplaint: "Fever and generalized fatigue",
+                          symptomDuration: "2 days",
+                          vitals: { bp: "120/80", pulse: "78", temp: "99.2", spo2: "98", respRate: "18", bloodSugar: "100" },
+                          symptomNotes: "Newly registered villager",
+                          isUrgent: false,
+                          status: "waiting_triage"
+                        };
+                        setPatients([newP, ...patients]);
+                        setSelectedPatId(newP.id);
+                      }
+                    }}
+                    className="bg-white text-emerald-900 px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-50 transition shadow"
+                  >
+                    + Register New Villager
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Patients List */}
+                  <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                    <h3 className="font-bold text-sm text-slate-800">Village Roster</h3>
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                      {patients.map(p => (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelectedPatId(p.id)}
+                          className={`p-3 rounded-xl border cursor-pointer transition ${
+                            selectedPatId === p.id ? "border-emerald-600 bg-emerald-50/50 shadow-xs ring-1 ring-emerald-500" : "border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-bold text-sm text-slate-900">{p.name}</div>
+                              <div className="text-xs text-slate-500">{p.village} ({p.age}y, {p.gender.charAt(0)})</div>
+                            </div>
+                            {p.isUrgent && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">URGENT</span>}
+                          </div>
+                          <div className="mt-2 text-xs text-slate-600 flex justify-between border-t pt-1.5">
+                            <span className="truncate max-w-[170px]">{p.primaryComplaint}</span>
+                            <span className="font-semibold text-slate-700">SpO2 {p.vitals.spo2}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Active Form */}
+                  <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+                    <div className="flex justify-between items-start border-b pb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{selectedPatient.name}</h3>
+                        <p className="text-xs text-slate-500">ID: {selectedPatient.nationalId} · Village: {selectedPatient.village}</p>
+                      </div>
+                      <button
+                        onClick={() => setTeleconsultPat(selectedPatient)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow"
+                      >
+                        <Icon name="video" className="w-3.5 h-3.5" />
+                        Connect Tele-Doctor
+                      </button>
+                    </div>
+
+                    {/* Urgent Alert Switch */}
+                    <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <Icon name="alertTriangle" className={`w-5 h-5 ${selectedPatient.isUrgent ? "text-red-600 animate-bounce" : "text-rose-400"}`} />
+                        <div>
+                          <span className="font-bold text-xs text-rose-900 block">Flag as URGENT Emergency Escalation</span>
+                          <span className="text-[11px] text-rose-700">Priority broadcast to on-call doctors at District Hospital</span>
+                        </div>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedPatient.isUrgent}
+                        onChange={(e) => {
+                          const updated = { ...selectedPatient, isUrgent: e.target.checked };
+                          setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
+                        }}
+                        className="w-5 h-5 text-red-600 rounded cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Vitals Grid */}
+                    <div>
+                      <h4 className="font-bold text-xs text-slate-700 mb-2 uppercase tracking-wider">Clinical Vitals</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
+                        {[
+                          { key: "spo2", label: "SpO2 (%)", val: selectedPatient.vitals.spo2 },
+                          { key: "temp", label: "Temp (°F)", val: selectedPatient.vitals.temp },
+                          { key: "bp", label: "BP (mmHg)", val: selectedPatient.vitals.bp },
+                          { key: "pulse", label: "Pulse (bpm)", val: selectedPatient.vitals.pulse },
+                          { key: "respRate", label: "Resp (/min)", val: selectedPatient.vitals.respRate },
+                          { key: "bloodSugar", label: "Sugar (mg/dL)", val: selectedPatient.vitals.bloodSugar },
+                        ].map(v => (
+                          <div key={v.key} className="p-2.5 bg-slate-50 border rounded-xl">
+                            <span className="text-[10px] font-bold text-slate-500 block">{v.label}</span>
+                            <input
+                              type="text"
+                              value={v.val}
+                              onChange={(e) => {
+                                const newVitals = { ...selectedPatient.vitals, [v.key]: e.target.value };
+                                setPatients(prev => prev.map(p => p.id === selectedPatient.id ? { ...p, vitals: newVitals } : p));
+                              }}
+                              className="w-full bg-white border rounded px-2 py-1 text-xs font-bold text-slate-900 mt-1"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Complaint & Notes */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Chief Complaint</label>
+                      <input
+                        type="text"
+                        value={selectedPatient.primaryComplaint}
+                        onChange={(e) => {
+                          const updated = { ...selectedPatient, primaryComplaint: e.target.value };
+                          setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
+                        }}
+                        className="w-full border rounded-xl px-3 py-2 text-xs bg-slate-50 font-medium"
+                      />
+                    </div>
+
+                    {/* Action Bar */}
+                    <div className="flex justify-between items-center pt-3 border-t">
+                      <button
+                        onClick={() => {
+                          const triage = calculateLocalTriage(selectedPatient);
+                          const updated = { ...selectedPatient, aiAssessment: triage, isUrgent: triage.urgency === "CRITICAL" };
+                          setPatients(prev => prev.map(p => p.id === updated.id ? updated : p));
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow flex items-center gap-1.5"
+                      >
+                        <Icon name="sparkles" className="w-4 h-4" />
+                        Run AI Triage &amp; Confidence
+                      </button>
+
+                      <button
+                        onClick={() => handleSaveIntake(selectedPatient)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow flex items-center gap-1.5"
+                      >
+                        <Icon name="check" className="w-4 h-4" />
+                        Save Record to Outbox
+                      </button>
+                    </div>
+
+                    {/* AI Assessment Card */}
+                    {selectedPatient.aiAssessment && (
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-2xl space-y-3">
+                        <div className="flex justify-between items-center border-b border-purple-200 pb-2">
+                          <span className="font-bold text-xs text-purple-950 flex items-center gap-1">
+                            <Icon name="sparkles" className="w-4 h-4 text-purple-700" />
+                            AI Preliminary Triage Impression
+                          </span>
+                          <span className="bg-white border border-purple-300 text-purple-900 text-xs font-extrabold px-2.5 py-0.5 rounded-full">
+                            {selectedPatient.aiAssessment.confidenceScore}% Model Confidence
+                          </span>
+                        </div>
+                        <div className="text-sm font-bold text-slate-900">{selectedPatient.aiAssessment.preliminaryAssessment}</div>
+                        <p className="text-xs text-slate-600">{selectedPatient.aiAssessment.urgencyReason}</p>
+                        <div className="text-xs bg-white p-3 rounded-xl border border-purple-100">
+                          <span className="font-bold text-slate-800 block mb-1">Recommended First-Aid Actions:</span>
+                          <ul className="list-disc pl-4 space-y-0.5 text-slate-600">
+                            {selectedPatient.aiAssessment.actions?.map((act, idx) => <li key={idx}>{act}</li>)}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PORTAL 2: DOCTOR TELEMEDICINE DESK */}
+            {role === "doctor" && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-blue-900 to-indigo-950 rounded-2xl p-5 text-white flex justify-between items-center">
+                  <div>
+                    <span className="text-[11px] uppercase tracking-wider font-bold bg-blue-700/50 px-2 py-0.5 rounded border border-blue-500/30">District Hospital Tele-Hub</span>
+                    <h2 className="text-xl font-bold mt-1">Doctor Telemedicine &amp; Triage Review Desk</h2>
+                    <p className="text-xs text-blue-100">Attend priority rural escalations, review AI confidence breakdowns, and prescribe digital medications.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Triage Queue */}
+                  <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                    <h3 className="font-bold text-sm text-slate-800">Priority Triage Queue</h3>
+                    <div className="space-y-2">
+                      {patients.map(p => (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelectedPatId(p.id)}
+                          className={`p-3.5 rounded-xl border cursor-pointer transition ${
+                            selectedPatId === p.id ? "border-blue-600 bg-blue-50/50 shadow-xs ring-1 ring-blue-600" : "border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <span className="font-bold text-sm text-slate-900">{p.name}</span>
+                            {p.isUrgent && <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">CRITICAL</span>}
+                          </div>
+                          <p className="text-xs text-slate-500">{p.village} · SpO2: {p.vitals.spo2}%</p>
+                          <p className="text-xs text-slate-700 mt-1 truncate">{p.primaryComplaint}</p>
+                          {p.aiAssessment && (
+                            <div className="mt-2 text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded inline-block">
+                              {p.aiAssessment.confidenceScore}% AI Confidence
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Doctor Consultation Area */}
+                  <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+                    <div className="flex justify-between items-start border-b pb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{selectedPatient.name} ({selectedPatient.age}y, {selectedPatient.gender})</h3>
+                        <p className="text-xs text-slate-500">Center: {selectedPatient.subCenter} · Phone: {selectedPatient.contactNumber}</p>
+                      </div>
+                      <button
+                        onClick={() => setTeleconsultPat(selectedPatient)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow"
+                      >
+                        <Icon name="video" className="w-4 h-4" />
+                        Start Video / Audio Teleconsult
+                      </button>
+                    </div>
+
+                    {/* Vitals Summary */}
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-xl border">
+                      <div><span className="text-[10px] text-slate-400 block">SpO2</span><span className="font-bold text-xs">{selectedPatient.vitals.spo2}%</span></div>
+                      <div><span className="text-[10px] text-slate-400 block">Temp</span><span className="font-bold text-xs">{selectedPatient.vitals.temp}°F</span></div>
+                      <div><span className="text-[10px] text-slate-400 block">BP</span><span className="font-bold text-xs">{selectedPatient.vitals.bp}</span></div>
+                      <div><span className="text-[10px] text-slate-400 block">Pulse</span><span className="font-bold text-xs">{selectedPatient.vitals.pulse} bpm</span></div>
+                      <div><span className="text-[10px] text-slate-400 block">Resp</span><span className="font-bold text-xs">{selectedPatient.vitals.respRate}/m</span></div>
+                      <div><span className="text-[10px] text-slate-400 block">Sugar</span><span className="font-bold text-xs">{selectedPatient.vitals.bloodSugar}</span></div>
+                    </div>
+
+                    {/* Prescription Form */}
+                    <div className="space-y-3 pt-2">
+                      <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider">Physician Diagnosis &amp; Digital Rx</h4>
+                      <input
+                        type="text"
+                        defaultValue={selectedPatient.aiAssessment?.preliminaryAssessment || "Acute Febrile Illness"}
+                        placeholder="Clinical Diagnosis"
+                        className="w-full border rounded-xl px-3 py-2 text-xs font-bold bg-slate-50"
+                      />
+                      <textarea
+                        rows="2"
+                        placeholder="Doctor's clinical advice and instructions for ASHA health worker..."
+                        defaultValue="Administer oral rehydration continuously. Keep patient monitored. Follow up in 3 days."
+                        className="w-full border rounded-xl px-3 py-2 text-xs bg-slate-50"
+                      ></textarea>
+
+                      <div className="p-3 bg-slate-50 rounded-xl border flex justify-between items-center text-xs">
+                        <div>
+                          <span className="font-bold text-slate-900 block">Paracetamol 500mg (1-0-1 after food)</span>
+                          <span className="text-slate-500 text-[11px]">Oral Rehydration Salts (ORS) sachet daily</span>
+                        </div>
+                        <span className="text-emerald-700 font-bold">5 Days Regimen</span>
+                      </div>
+
+                      <div className="flex justify-end pt-3 border-t">
+                        <button
+                          onClick={() => {
+                            setActiveRx({
+                              patient: selectedPatient,
+                              doctor: "Dr. Ananya Sen, MD (Rural Outreach)",
+                              date: new Date().toISOString().split("T")[0],
+                              diagnosis: selectedPatient.aiAssessment?.preliminaryAssessment || "Acute Condition",
+                              rx: ["Paracetamol 500mg - 1 tab twice daily after food", "WHO Low-Osmolarity ORS - 1 packet in 1L clean water"]
+                            });
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow flex items-center gap-1.5"
+                        >
+                          <Icon name="printer" className="w-4 h-4" />
+                          Sign &amp; Generate e-Prescription (PDF/Print)
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PORTAL 3: INVENTORY & COLD-CHAIN */}
+            {role === "inventory" && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-indigo-900 to-slate-900 rounded-2xl p-5 text-white flex justify-between items-center">
+                  <div>
+                    <span className="text-[11px] uppercase tracking-wider font-bold bg-indigo-700/50 px-2 py-0.5 rounded border border-indigo-500/30">Dispensary Logistics</span>
+                    <h2 className="text-xl font-bold mt-1">Medicine &amp; Vaccine Stock Tracker</h2>
+                    <p className="text-xs text-indigo-100">Live inventory monitoring, vaccine cold-chain refrigerator telemetry, and district warehouse refill alerts.</p>
+                  </div>
+                </div>
+
+                {/* Cold Chain Refrigerator Widget */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center">
+                      <Icon name="thermometer" className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-slate-900">Vaccine Refrigerator (ILR-02)</h3>
+                      <p className="text-xs text-slate-500">IoT Continuous Telemetry · Solar Inverter Backup: 94%</p>
+                    </div>
+                  </div>
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold">
+                    Current: 3.8°C (Safe Zone: 2°C - 8°C)
+                  </span>
+                </div>
+
+                {/* Stock Table */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b text-slate-600 font-semibold">
+                      <tr>
+                        <th className="p-3">Drug / Vaccine Name</th>
+                        <th className="p-3">Category</th>
+                        <th className="p-3">Quantity</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {inventory.map(item => {
+                        const isLow = item.quantity <= item.minThreshold;
+                        return (
+                          <tr key={item.id} className={isLow ? "bg-amber-50/40" : ""}>
+                            <td className="p-3">
+                              <span className="font-bold text-slate-900 block">{item.name}</span>
+                              <span className="text-[10px] text-slate-400">Batch: {item.batch}</span>
+                            </td>
+                            <td className="p-3 text-slate-600">{item.category}</td>
+                            <td className="p-3 font-bold">{item.quantity} {item.unit}</td>
+                            <td className="p-3">
+                              {isLow ? (
+                                <span className="bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded text-[10px]">LOW STOCK</span>
+                              ) : (
+                                <span className="bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded text-[10px]">Adequate</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-right">
+                              {isLow ? (
+                                <button
+                                  onClick={() => alert(`Replenishment requested for ${item.name} from District Warehouse!`)}
+                                  className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1 rounded-lg text-xs"
+                                >
+                                  Order Refill
+                                </button>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">Normal</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* PORTAL 4: BID STRATEGY & TECHNICAL BLUEPRINT */}
+            {role === "bid" && (
+              <div className="space-y-6">
+                <div className="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-sm">
+                  <span className="bg-purple-500/30 text-purple-200 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-purple-400/30 uppercase tracking-wider">
+                    Winning Project Bid Proposal
+                  </span>
+                  <h2 className="text-2xl font-bold tracking-tight mt-2">What to Bid: Rural Outreach &amp; Telemedicine</h2>
+                  <p className="text-purple-100 text-sm mt-1 max-w-2xl">
+                    Comprehensive technical and commercial proposal answering tender specifications for Government Health Missions and Global NGOs.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                    <div className="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold">1</div>
+                    <h3 className="font-bold text-sm text-slate-900">Zero-Connectivity PWA</h3>
+                    <p className="text-slate-600">Local-first IndexedDB offline caching ensures health workers can register patients and record vitals with 0% data loss in dead-zones.</p>
+                  </div>
+
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">2</div>
+                    <h3 className="font-bold text-sm text-slate-900">AI Confidence Dial</h3>
+                    <p className="text-slate-600">Provides doctors with a calibrated 0-100% confidence score and differential conditions rather than black-box autonomous diagnoses.</p>
+                  </div>
+
+                  <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold">3</div>
+                    <h3 className="font-bold text-sm text-slate-900">Cold-Chain &amp; Stock IoT</h3>
+                    <p className="text-slate-600">Continuous telemetry on vaccine refrigerators prevents stockouts of Anti-Snake Venom and Rabies vaccines in remote centers.</p>
+                  </div>
+                </div>
+
+                {/* Commercials Table */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs text-xs space-y-3">
+                  <h3 className="font-bold text-sm text-slate-900">Commercial Turnkey Bid Structure (Sample 100-Center Pilot)</h3>
+                  <table className="w-full text-left border rounded-xl overflow-hidden">
+                    <thead className="bg-slate-50 border-b text-slate-600 font-semibold">
+                      <tr>
+                        <th className="p-2.5">Scope Component</th>
+                        <th className="p-2.5">Specification</th>
+                        <th className="p-2.5 text-right">Cost (USD)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      <tr><td className="p-2.5 font-bold">Platform SaaS &amp; Cloud</td><td className="p-2.5">Offline PWA, Doctor Desk, AI Triage, 99.9% uptime SLA</td><td className="p-2.5 text-right font-bold">$18,000 / yr</td></tr>
+                      <tr><td className="p-2.5 font-bold">Field Rugged Hardware</td><td className="p-2.5">100 Android Tablets, Solar Power Banks, Bluetooth SpO2/BP Cuffs</td><td className="p-2.5 text-right font-bold">$32,000</td></tr>
+                      <tr><td className="p-2.5 font-bold">Cold-Chain IoT Probes</td><td className="p-2.5">LoRaWAN / GSM Refrigerator probes with battery backup</td><td className="p-2.5 text-right font-bold">$8,500</td></tr>
+                      <tr><td className="p-2.5 font-bold">Health Worker Training</td><td className="p-2.5">Field training in regional languages for 150 ASHA nurses</td><td className="p-2.5 text-right font-bold">$12,000</td></tr>
+                      <tr className="bg-slate-50 font-bold text-purple-950"><td className="p-2.5" colSpan="2">Estimated Turnkey Pilot Total</td><td className="p-2.5 text-right text-sm text-purple-700">$70,500</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* TELECONSULTATION CALL MODAL */}
+          {teleconsultPat && (
+            <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-4xl p-6 text-white space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 className="font-bold text-sm">Live Teleconsultation: {teleconsultPat.name}</h3>
+                    <p className="text-xs text-slate-400">Village: {teleconsultPat.village} · ASHA Terminal Active</p>
+                  </div>
+                  <button onClick={() => setTeleconsultPat(null)} className="text-slate-400 hover:text-white font-bold">✕</button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="aspect-video bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-xs">
+                    <div className="w-12 h-12 rounded-full bg-emerald-900/50 border border-emerald-500 flex items-center justify-center text-lg font-bold text-emerald-300 mb-2">
+                      {teleconsultPat.name.charAt(0)}
+                    </div>
+                    <span>{teleconsultPat.name} &amp; ASHA Nurse</span>
+                    <span className="text-[10px] text-slate-400 mt-1">SpO2: {teleconsultPat.vitals.spo2}% · Temp: {teleconsultPat.vitals.temp}°F</span>
+                  </div>
+
+                  <div className="aspect-video bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center justify-center text-xs">
+                    <div className="w-12 h-12 rounded-full bg-blue-900/50 border border-blue-500 flex items-center justify-center text-lg font-bold text-blue-300 mb-2">
+                      Dr
+                    </div>
+                    <span>Dr. Ananya Sen, MD</span>
+                    <span className="text-[10px] text-blue-400 mt-1">District Outreach Tele-Physician</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-xs text-slate-400">Connection: WebRTC 2G Low-Latency Audio Enabled</span>
+                  <button
+                    onClick={() => {
+                      alert("Consultation complete! Prescription saved to patient history.");
+                      setTeleconsultPat(null);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2 rounded-xl shadow"
+                  >
+                    Complete Call &amp; Issue e-Prescription
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* e-PRESCRIPTION PRINT/VIEW MODAL */}
+          {activeRx && (
+            <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white text-slate-900 rounded-3xl w-full max-w-xl p-6 shadow-2xl space-y-4">
+                <div className="flex justify-between items-start border-b pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-emerald-900">District Telemedicine Health Network</h3>
+                    <p className="text-xs text-slate-500">Official Electronic Prescription (e-Rx)</p>
+                  </div>
+                  <button onClick={() => setActiveRx(null)} className="text-slate-400 font-bold">✕</button>
+                </div>
+
+                <div className="text-xs space-y-2">
+                  <div className="flex justify-between">
+                    <div>
+                      <span className="font-bold block">{activeRx.doctor}</span>
+                      <span className="text-slate-500">District Hospital Telemedicine Wing</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold block">{activeRx.patient.name} ({activeRx.patient.age}y)</span>
+                      <span className="text-slate-500">{activeRx.patient.village}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-3 rounded-xl border">
+                    <span className="font-bold block text-slate-800">Diagnosis: {activeRx.diagnosis}</span>
+                    <span className="text-slate-500 text-[11px]">Vitals: SpO2 {activeRx.patient.vitals.spo2}%, Temp {activeRx.patient.vitals.temp}°F, BP {activeRx.patient.vitals.bp}</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="font-bold block text-slate-700 uppercase tracking-wider text-[10px]">Prescribed Medications:</span>
+                    {activeRx.rx.map((r, i) => (
+                      <div key={i} className="p-2 bg-emerald-50/50 border border-emerald-100 rounded-lg text-xs font-semibold text-emerald-900">
+                        {i + 1}. {r}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <button onClick={() => setActiveRx(null)} className="px-4 py-2 text-xs font-semibold text-slate-600">Close</button>
+                  <button onClick={() => window.print()} className="bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-xl shadow">Print / Save PDF</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Persistent Footer */}
+          <footer className="mt-auto border-t border-slate-200 bg-white py-3 px-4 text-xs text-slate-500">
+            <div className="max-w-7xl mx-auto flex justify-between items-center">
+              <span>ArogyaSeva TeleHealth · Offline-First Rural Outreach Platform</span>
+              <span className="text-emerald-600 font-semibold">● PWA Ready · Zero Data Loss Architecture</span>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
